@@ -1,10 +1,12 @@
 # Load the images from assets folder
 lt_order_icon = image.load("assets/lt_order.png")  # For counter LT
 order_icon = image.load("assets/order.png")        # For counters G1 and G2
+irregular_icon = image.load("assets/irregular_order.png")  # For counters G1I and G2I
 command_token_icon = image.load("assets/command_token.png")  # For counter CT
 
 # Display Constants
 ICON_SPACING = 8  # Space between icons (vertical and horizontal)
+G_ICON_SPACING = 12
 HIGHLIGHT_PADDING_H = 2  # Horizontal highlight padding
 HIGHLIGHT_PADDING_V = -2  # Vertical highlight padding
 IMAGE_PADDING_Y = 4 
@@ -47,7 +49,18 @@ def update():
     c_held = badge.held(BUTTON_C)
     
     # Handle counter selection and modification
-    if a_held:
+    if c_held and badge.pressed(BUTTON_A):
+        # Reset all counters except CT to default values
+        counters["LT"] = default_counters["LT"]
+        counters["G1"] = default_counters["G1"]
+        counters["G2"] = default_counters["G2"]
+        counters["G1I"] = default_counters["G1I"]
+        counters["G2I"] = default_counters["G2I"]
+    elif c_held and badge.pressed(BUTTON_B):
+        # Set all counters to 0
+        for counter_name in counters:
+            counters[counter_name] = 0
+    elif a_held:
         active_counter = "LT"
         # When A is held, UP/DOWN modifies CT counter directly
         if badge.pressed(BUTTON_UP):
@@ -124,7 +137,40 @@ def update():
             section_center = (i * section_width) + (section_width // 2)
             icon_base_x = section_center - (current_icon.width // 2)
             
+            # Apply G_ICON_SPACING offset for G1 and G2 (negative offset) only if both regular and irregular counters > 0
+            if counter_name == "G1" and counters["G1"] > 0 and counters["G1I"] > 0:
+                icon_base_x -= G_ICON_SPACING
+            elif counter_name == "G2" and counters["G2"] > 0 and counters["G2I"] > 0:
+                icon_base_x -= G_ICON_SPACING
+            
             # Start from bottom and work up
+            bottom_y = screen.height - sample_text_height - current_icon.height - HIGHLIGHT_PADDING_V + IMAGE_PADDING_Y
+            
+            # Draw each icon for this counter, starting from the bottom (index 0) going up
+            for j in range(current_count):
+                icon_y = bottom_y - (j * ICON_SPACING)
+                screen.blit(current_icon, vec2(icon_base_x, icon_y))
+    
+    # Display G1I and G2I icons with offset positioning
+    for i, counter_name in enumerate(["G1I", "G2I"]):
+        current_count = counters[counter_name]
+        
+        if current_count > 0:
+            # Use irregular_icon for both G1I and G2I
+            current_icon = irregular_icon
+            
+            # Calculate x position based on corresponding G1/G2 section (i+1 because G1=index 1, G2=index 2)
+            section_index = i + 1  # G1I uses G1's section (1), G2I uses G2's section (2)
+            section_center = (section_index * section_width) + (section_width // 2)
+            icon_base_x = section_center - (current_icon.width // 2)
+            
+            # Apply the positive G_ICON_SPACING offset for irregular icons only if both regular and irregular counters > 0
+            if counter_name == "G1I" and counters["G1"] > 0 and counters["G1I"] > 0:
+                icon_base_x += G_ICON_SPACING
+            elif counter_name == "G2I" and counters["G2"] > 0 and counters["G2I"] > 0:
+                icon_base_x += G_ICON_SPACING
+            
+            # Start from bottom and work up (same Y positioning as regular counters)
             bottom_y = screen.height - sample_text_height - current_icon.height - HIGHLIGHT_PADDING_V + IMAGE_PADDING_Y
             
             # Draw each icon for this counter, starting from the bottom (index 0) going up
