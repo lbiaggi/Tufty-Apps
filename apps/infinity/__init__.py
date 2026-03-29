@@ -24,8 +24,8 @@ HOLD_TEXT_COLOR = color.rgb(233, 233, 100)  # Yellow for active counter
 INACTIVE_TEXT_COLOR = color.rgb(180, 180, 180)  # Gray for inactive counter
 
 # Counter state
-counters = {"LT": 1, "G1": 5, "G2": 10, "CT": 4}
-default_counters = {"LT": 1, "G1": 5, "G2": 10, "CT": 4}  # Store default values for reset
+counters = {"LT": 1, "G1": 5, "G2": 10, "CT": 4, "G1I": 0, "G2I": 0}
+default_counters = {"LT": 1, "G1": 5, "G2": 10, "CT": 4, "G1I": 0, "G2I": 0}  # Store default values for reset
 active_counter = "LT"  # Which counter is currently selected
 MIN_COUNT = 0
 MAX_COUNT_LT = 2  # LT has different max count
@@ -58,8 +58,22 @@ def update():
                 counters["CT"] -= 1
     elif b_held:
         active_counter = "G1"
+        # When B is held, UP/DOWN modifies G1I counter directly
+        if badge.pressed(BUTTON_UP):
+            if counters["G1I"] < MAX_COUNT_G:
+                counters["G1I"] += 1
+        elif badge.pressed(BUTTON_DOWN):
+            if counters["G1I"] > MIN_COUNT:
+                counters["G1I"] -= 1
     elif c_held:
         active_counter = "G2"
+        # When C is held, UP/DOWN modifies G2I counter directly
+        if badge.pressed(BUTTON_UP):
+            if counters["G2I"] < MAX_COUNT_G:
+                counters["G2I"] += 1
+        elif badge.pressed(BUTTON_DOWN):
+            if counters["G2I"] > MIN_COUNT:
+                counters["G2I"] -= 1
     else:
         # Handle up/down for the active counter (only nothing is held)
         if badge.pressed(BUTTON_UP):
@@ -68,6 +82,9 @@ def update():
                     counters[active_counter] += 1
             elif active_counter == "CT":
                 if counters[active_counter] < MAX_COUNT_CT:
+                    counters[active_counter] += 1
+            elif active_counter in ["G1I", "G2I"]:
+                if counters[active_counter] < MAX_COUNT_G:
                     counters[active_counter] += 1
             else:
                 if counters[active_counter] < MAX_COUNT_G:
@@ -117,10 +134,16 @@ def update():
     # Display LT, G1, G2 counters at the bottom edge (CT displayed at top)
     counter_y = screen.height - sample_text_height - HIGHLIGHT_PADDING_V  # Position text to touch bottom of screen
     
-    # Calculate positions for LT, G1, G2 (1/3 of screen width each)
+    # Calculate positions for bottom counters (1/3 of screen width each)
     section_width = screen.width // SCREEN_THIRDS
     
-    for i, counter_name in enumerate(["LT", "G1", "G2"]):
+    # Choose which counters to display at the bottom based on button states
+    counter_1 = "CT" if a_held else "LT"
+    counter_2 = "G1I" if b_held else "G1"
+    counter_3 = "G2I" if c_held else "G2"
+    bottom_counters = [counter_1, counter_2, counter_3]
+    
+    for i, counter_name in enumerate(bottom_counters):
         # Position each counter in its section
         section_center = (i * section_width) + (section_width // 2)
         
@@ -129,8 +152,10 @@ def update():
         text_x = section_center - (text_width // 2)
         
         # Determine text color based on button state
-        if (counter_name == "LT" and a_held) or (counter_name == "G1" and b_held) or (counter_name == "G2" and c_held):
-            # Button held - use hold color with highlight
+        if ((a_held and counter_name == "CT") or
+            (b_held and counter_name == "G1I") or
+            (c_held and counter_name == "G2I")):
+            # Button held and showing corresponding counter - use hold color with highlight
             screen.pen = HIGHLIGHT_COLOR
             screen.shape(shape.rectangle(text_x - HIGHLIGHT_PADDING_H, counter_y - HIGHLIGHT_PADDING_V, text_width + (HIGHLIGHT_PADDING_H * 2), text_height + (HIGHLIGHT_PADDING_V * 2)))
             
