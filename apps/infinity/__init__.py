@@ -9,7 +9,7 @@ HIGHLIGHT_PADDING_H = 2  # Horizontal highlight padding
 HIGHLIGHT_PADDING_V = -2  # Vertical highlight padding
 IMAGE_PADDING_Y = 4 
 CT_TOP_MARGIN = 0  # CT text distance from screen top
-CT_IMAGE_PADDING_X = -8
+CT_IMAGE_PADDING_X = 0
 
 # Screen Layout Constants  
 SCREEN_THIRDS = 3  # Number of bottom counter sections
@@ -19,7 +19,8 @@ CT_POSITION_DIVISOR = 6  # Screen width divisor for CT positioning (1/6 = left h
 BG_COLOR = color.rgb(20, 25, 40)  # Dark blue background
 HIGHLIGHT_COLOR = color.rgb(60, 80, 120)  # Active counter highlight
 SHADOW_COLOR = color.rgb(0, 0, 0)  # Text shadow
-ACTIVE_TEXT_COLOR = color.rgb(233, 123, 22)  # Yellow for active counter
+ACTIVE_TEXT_COLOR = color.rgb(233, 123, 22)  # Orange for active counter
+HOLD_TEXT_COLOR = color.rgb(233, 233, 100)  # Yellow for active counter
 INACTIVE_TEXT_COLOR = color.rgb(180, 180, 180)  # Gray for inactive counter
 
 # Counter state
@@ -40,75 +41,53 @@ def update():
     screen.font = large_font
     sample_text_width, sample_text_height = screen.measure_text("0")  # Measure once for consistent sizing
     
-    # Handle counter selection (A toggles LT/CT, B=G1, C=G2 or reset if G2 active)
-    if badge.pressed(BUTTON_A):
-        if active_counter == "LT":
-            active_counter = "CT"
-        else:
-            active_counter = "LT"
-    elif badge.pressed(BUTTON_B):
+    # Check if A button is being held down
+    a_held = badge.held(BUTTON_A)
+    b_held = badge.held(BUTTON_B)
+    c_held = badge.held(BUTTON_C)
+    
+    # Handle counter selection and modification
+    if a_held:
+        active_counter = "LT"
+        # When A is held, UP/DOWN modifies CT counter directly
+        if badge.pressed(BUTTON_UP):
+            if counters["CT"] < MAX_COUNT_CT:
+                counters["CT"] += 1
+        elif badge.pressed(BUTTON_DOWN):
+            if counters["CT"] > MIN_COUNT:
+                counters["CT"] -= 1
+    elif b_held:
         active_counter = "G1"
-    elif badge.pressed(BUTTON_C):
-        if active_counter == "G2":
-            # Reset all counters to default values except CT
-            current_ct = counters["CT"]  # Save current CT value
-            counters.update(default_counters)
-            counters["CT"] = current_ct  # Restore CT value
-        else:
-            active_counter = "G2"
-    
-    # Handle up/down for the active counter
-    if badge.pressed(BUTTON_UP):
-        if active_counter == "LT":
-            if counters[active_counter] < MAX_COUNT_LT:
-                counters[active_counter] += 1
-        elif active_counter == "CT":
-            if counters[active_counter] < MAX_COUNT_CT:
-                counters[active_counter] += 1
-        else:
-            if counters[active_counter] < MAX_COUNT_G:
-                counters[active_counter] += 1
-    
-    if badge.pressed(BUTTON_DOWN):
-        if counters[active_counter] > MIN_COUNT:
-            counters[active_counter] -= 1
+    elif c_held:
+        active_counter = "G2"
+    else:
+        # Handle up/down for the active counter (only nothing is held)
+        if badge.pressed(BUTTON_UP):
+            if active_counter == "LT":
+                if counters[active_counter] < MAX_COUNT_LT:
+                    counters[active_counter] += 1
+            elif active_counter == "CT":
+                if counters[active_counter] < MAX_COUNT_CT:
+                    counters[active_counter] += 1
+            else:
+                if counters[active_counter] < MAX_COUNT_G:
+                    counters[active_counter] += 1
+        
+        if badge.pressed(BUTTON_DOWN):
+            if counters[active_counter] > MIN_COUNT:
+                counters[active_counter] -= 1
     
     # Clear the screen with a nice background color
     screen.pen = BG_COLOR
     screen.shape(shape.rectangle(0, 0, screen.width, screen.height))
     
-    # Display CT counter at top left corner
-    ct_text = str(counters["CT"])
-    ct_text_width, ct_text_height = screen.measure_text(ct_text)  # Measure actual CT text
-    ct_x = 0  # Top left corner
-    ct_y = CT_TOP_MARGIN + HIGHLIGHT_PADDING_V
-    
-    # Highlight CT if it's active
-    if active_counter == "CT":
-        # Draw background highlight for active counter (reduced vertical padding)
-        screen.pen = HIGHLIGHT_COLOR
-        screen.shape(shape.rectangle(ct_x - HIGHLIGHT_PADDING_H, ct_y - HIGHLIGHT_PADDING_V, ct_text_width + (HIGHLIGHT_PADDING_H * 2), ct_text_height + (HIGHLIGHT_PADDING_V * 2)))
-        
-        # Draw text with shadow effect
-        screen.pen = SHADOW_COLOR  # Black shadow
-        screen.text(ct_text, ct_x + 1, ct_y + 1)
-        screen.pen = ACTIVE_TEXT_COLOR  # Yellow text for active
-    else:
-        # Draw text with shadow effect
-        screen.pen = SHADOW_COLOR  # Black shadow
-        screen.text(ct_text, ct_x + 1, ct_y + 1)
-        screen.pen = INACTIVE_TEXT_COLOR  # Gray text for inactive
-    
-    screen.text(ct_text, ct_x, ct_y)
-    
-    # Display CT command token images horizontally from right of number
+    # Display CT command token images horizontally from left edge
     ct_count = counters["CT"]
     if ct_count > 0:
-        ct_start_x = ct_text_width + ICON_SPACING  # Start from right side of number
-        
+        ct_start_x = CT_IMAGE_PADDING_X  # Start from left edge
         # Draw each CT icon from left to right
         for j in range(ct_count):
-            icon_x = ct_start_x + CT_IMAGE_PADDING_X + (j * ICON_SPACING)
+            icon_x = ct_start_x + (j * ICON_SPACING)
             icon_y = CT_TOP_MARGIN
             screen.blit(command_token_icon, vec2(icon_x, icon_y))
     
@@ -149,18 +128,27 @@ def update():
         text_width, text_height = screen.measure_text(counter_text)  # Measure actual text for proper centering
         text_x = section_center - (text_width // 2)
         
-        # Highlight the active counter (excluding CT which is displayed at top) - reduced padding
-        if counter_name == active_counter:
-            # Draw background highlight for active counter (reduced vertical padding)
+        # Determine text color based on button state
+        if (counter_name == "LT" and a_held) or (counter_name == "G1" and b_held) or (counter_name == "G2" and c_held):
+            # Button held - use hold color with highlight
             screen.pen = HIGHLIGHT_COLOR
             screen.shape(shape.rectangle(text_x - HIGHLIGHT_PADDING_H, counter_y - HIGHLIGHT_PADDING_V, text_width + (HIGHLIGHT_PADDING_H * 2), text_height + (HIGHLIGHT_PADDING_V * 2)))
             
             # Draw text with shadow effect
             screen.pen = SHADOW_COLOR  # Black shadow
             screen.text(counter_text, text_x + 1, counter_y + 1)
-            screen.pen = ACTIVE_TEXT_COLOR  # Yellow text for active
-        else:
+            screen.pen = HOLD_TEXT_COLOR  # Yellow text for held
+        elif counter_name == active_counter:
+            # Active counter (not held) - use active color with highlight
+            screen.pen = HIGHLIGHT_COLOR
+            screen.shape(shape.rectangle(text_x - HIGHLIGHT_PADDING_H, counter_y - HIGHLIGHT_PADDING_V, text_width + (HIGHLIGHT_PADDING_H * 2), text_height + (HIGHLIGHT_PADDING_V * 2)))
+            
             # Draw text with shadow effect
+            screen.pen = SHADOW_COLOR  # Black shadow
+            screen.text(counter_text, text_x + 1, counter_y + 1)
+            screen.pen = ACTIVE_TEXT_COLOR  # Orange text for active
+        else:
+            # Inactive counter - use inactive color, no highlight
             screen.pen = SHADOW_COLOR  # Black shadow
             screen.text(counter_text, text_x + 1, counter_y + 1)
             screen.pen = INACTIVE_TEXT_COLOR  # Gray text for inactive
