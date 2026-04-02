@@ -24,6 +24,7 @@ INACTIVE = color.rgb(180, 180, 180)
 
 # global things
 active = 0
+prev_active = active
 pos = vec2(0, 0)
 
 # STATES for (LT, G1, G2, CT, G1I, G2I)
@@ -43,12 +44,10 @@ SECTION_W = SCREEN_W // 3
 CHAR_W, text_h = screen.measure_text("0")
 BOTTOM_Y = SCREEN_H - text_h - HIGHLIGHT_PADDING_V
 
-# Apparently got in the middle of x86 vs arm details implementations
-# TODO: read which cpu is used in rp2350.
 CENTER_X = (
-    SECTION_W // 2,  #  SECTION_W >> 1,
-    SECTION_W + (SECTION_W // 2),  #  SECTION_W + (SECTION_W >> 1),
-    (SECTION_W * 2) + (SECTION_W // 2),  # SECTION_W << 1) + (SECTION_W >> 1),
+    SECTION_W // 2,
+    SECTION_W + (SECTION_W // 2),
+    (SECTION_W * 2) + (SECTION_W // 2),
 )
 
 ICONS = (
@@ -63,11 +62,11 @@ ICONS = (
 SECTIONS = (0, 1, 2, 0, 1, 2)
 
 OFFSET_DEP = (
-    (-1, 0),  # dummy
-    (4, -1),  # 1 depends on 4 → negative
+    (-1, 0),
+    (4, -1),
     (5, -1),
     (0, 0),
-    (1, 1),  # 4 depends on 1 → positive
+    (1, 1),
     (2, 1),
 )
 
@@ -131,7 +130,6 @@ def handle_input():
     return s
 
 
-# Lazy draw changes when you can
 def draw_icons():
     cnts = counters
     bottom_y = BOTTOM_Y - IMAGE_PADDING_Y
@@ -144,7 +142,7 @@ def draw_icons():
         icon, w, h = ICONS[i]
 
         cx = CENTER_X[SECTIONS[i]]
-        x = cx - (w >> 1)
+        x = cx - (w // 2)
 
         dep, direction = OFFSET_DEP[i]
         if dep and cnts[dep]:
@@ -185,7 +183,7 @@ def draw_text(s):
         val = STRINGS[cnts[idx]]
 
         w = len(val) * CHAR_W
-        x = CENTER_X[i] - (w >> 1)
+        x = CENTER_X[i] - (w // 2)
 
         held = s and idx == STATE_TO_INDEX[s]
 
@@ -235,7 +233,6 @@ def update():
     if not dirty:
         return
 
-    # Save state
     prev_state = s
     prev_active = active
 
